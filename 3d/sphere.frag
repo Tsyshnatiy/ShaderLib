@@ -2,21 +2,52 @@
 precision mediump float;
 #endif
 
+#define M_PI 3.14159265
+
 uniform vec2 u_resolution;
+uniform float u_time;
 
 const int MAX_MARCHING_STEPS = 255;
 const float MIN_DIST = 0.0001;
 const float MAX_DIST = 100.0;
 const float EPSILON = 0.0001;
 
-float sphereSDF(vec3 samplePoint) {
-    return length(samplePoint) - 1.0;
+struct Sphere {
+    vec3 pos;
+    float r;
+};
+
+Sphere spheres[2];
+
+mat4 rotation3d(vec3 axis, float angle) {
+  axis = normalize(axis);
+  float s = sin(angle);
+  float c = cos(angle);
+  float oc = 1.0 - c;
+
+  return mat4(
+    oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+    oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+    oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+    0.0,                                0.0,                                0.0,                                1.0
+  );
+}
+
+float sceneSdf(vec3 samplePoint) {
+    float result = MAX_DIST;
+    
+    for (int i = 0 ; i < 2 ; ++i) {
+        vec3 v = samplePoint - spheres[i].pos;
+        result = min(result, length(v) - spheres[i].r);
+    }
+    
+    return result;
 }
 
 float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, float end) {
     float depth = start;
     for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
-        float dist = sphereSDF(eye + depth * marchingDirection);
+        float dist = sceneSdf(eye + depth * marchingDirection);
         if (dist < EPSILON) {
 	    return depth;
         }
@@ -36,9 +67,9 @@ vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord) {
 
 vec3 estimateNormal(vec3 p) {
     return normalize(vec3(
-        sphereSDF(vec3(p.x + EPSILON, p.y, p.z)) - sphereSDF(vec3(p.x - EPSILON, p.y, p.z)),
-        sphereSDF(vec3(p.x, p.y + EPSILON, p.z)) - sphereSDF(vec3(p.x, p.y - EPSILON, p.z)),
-        sphereSDF(vec3(p.x, p.y, p.z  + EPSILON)) - sphereSDF(vec3(p.x, p.y, p.z - EPSILON))
+        sceneSdf(vec3(p.x + EPSILON, p.y, p.z)) - sceneSdf(vec3(p.x - EPSILON, p.y, p.z)),
+        sceneSdf(vec3(p.x, p.y + EPSILON, p.z)) - sceneSdf(vec3(p.x, p.y - EPSILON, p.z)),
+        sceneSdf(vec3(p.x, p.y, p.z  + EPSILON)) - sceneSdf(vec3(p.x, p.y, p.z - EPSILON))
     ));
 }
 
@@ -52,13 +83,13 @@ vec3 lambertIllumination(vec3 p, vec3 lightPos) {
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec3 dir = rayDirection(75., u_resolution.xy, fragCoord);
-    vec3 eye = vec3(0.0, 0.0, 5.0);
+    vec3 eye = vec3(1.0, 1.0, 10.0);
     float dist = shortestDistanceToSurface(eye, dir, MIN_DIST, MAX_DIST);
     
     if (dist > MAX_DIST - EPSILON) {
         // Didn't hit anything
         fragColor = vec4(0.0, 0.0, 0.0, 0.0);
-		return;
+	return;
     }
     
     // The closest point on the surface to the eyepoint along the view ray
@@ -70,5 +101,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 
 void main() {
+    spheres[0] = Sphere(vec3(0.0, 1.0, 0.0), 1.0);
+    spheres[1] = Sphere(vec3(1.0, 0.0, -2.0), 1.352);
+    
+    mat3 camera_dir = mat3(rotation3d(vec3(1.0, 1.0, 0.0), u_time));
+    for (int i = 0 ; i < 2; ++i) {
+        spheres[i].pos = camera_dir * spheres[i].pos;
+    }
+    
     mainImage(gl_FragColor, gl_FragCoord.xy);
 }
