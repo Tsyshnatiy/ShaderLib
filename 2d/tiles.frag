@@ -4,6 +4,8 @@
 precision mediump float;
 #endif
 
+#define M_PI 3.14159265
+
 uniform vec2 u_resolution;
 uniform float u_time;
 
@@ -23,9 +25,17 @@ vec3 draw_rect(vec2 center, vec2 size, vec3 color, vec2 uv) {
 
 float circle(in vec2 _st, in float _radius){
     vec2 l = _st - vec2(0.5);
-    return 1. - smoothstep(_radius - (_radius * 0.01),
-                           _radius + (_radius * 0.01),
-                           dot(l, l) * 4.0);
+    return 1.-smoothstep(_radius - (_radius * 0.01),
+                         _radius + (_radius * 0.01),
+                         dot(l,l)*4.0);
+}
+
+vec2 rotate2D(vec2 _st, float _angle){
+    _st -= 0.5;
+    _st =  mat2(cos(_angle), -sin(_angle),
+                sin(_angle), cos(_angle)) * _st;
+    _st += 0.5;
+    return _st;
 }
 
 struct Tile {
@@ -43,18 +53,19 @@ Tile make_tiles(vec2 st, float n, float m) {
 }
 
 void main() {
-    vec2 st = gl_FragCoord.xy / u_resolution;
+vec2 st = gl_FragCoord.xy / u_resolution;
     vec3 color = vec3(0.0);
 	
     Tile tile = make_tiles(st, 3., 3.);
 	st = tile.st;
     
     if (tile.index.y == 1.0 || tile.index.x == 1.0) {
+        st = rotate2D(st, M_PI / 4.0);
         color = draw_rect(vec2(0.5, 0.5), vec2(0.5, 0.5), vec3(1.0), st);
     }
     else {
         color = vec3(circle(st, 0.5));
     }
     
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(color,1.0);
 }
