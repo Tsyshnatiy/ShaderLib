@@ -19,6 +19,57 @@ struct Sphere {
 
 Sphere spheres[2];
 
+
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
+
+vec3 random3(vec3 c) {
+    float j = 4096.0*sin(dot(c,vec3(17.0, 59.4, 15.0)));
+    vec3 r;
+    r.z = fract(512.0*j);
+    j *= .125;
+    r.x = fract(512.0*j);
+    j *= .125;
+    r.y = fract(512.0*j);
+    return r-0.5;
+}
+
+float snoise(vec3 p) {
+    const float F3 =  0.3333333;
+    const float G3 =  0.1666667;
+
+    vec3 s = floor(p + dot(p, vec3(F3)));
+    vec3 x = p - s + dot(s, vec3(G3));
+
+    vec3 e = step(vec3(0.0), x - x.yzx);
+    vec3 i1 = e*(1.0 - e.zxy);
+    vec3 i2 = 1.0 - e.zxy*(1.0 - e);
+
+    vec3 x1 = x - i1 + G3;
+    vec3 x2 = x - i2 + 2.0*G3;
+    vec3 x3 = x - 1.0 + 3.0*G3;
+
+    vec4 w, d;
+
+    w.x = dot(x, x);
+    w.y = dot(x1, x1);
+    w.z = dot(x2, x2);
+    w.w = dot(x3, x3);
+
+    w = max(0.6 - w, 0.0);
+
+    d.x = dot(random3(s), x);
+    d.y = dot(random3(s + i1), x1);
+    d.z = dot(random3(s + i2), x2);
+    d.w = dot(random3(s + 1.0), x3);
+
+    w *= w;
+    w *= w;
+    d *= w;
+
+    return dot(d, vec4(52.0));
+}
+
 mat4 rotation3d(vec3 axis, float angle) {
   axis = normalize(axis);
   float s = sin(angle);
@@ -35,10 +86,11 @@ mat4 rotation3d(vec3 axis, float angle) {
 
 float sceneSdf(vec3 samplePoint) {
     float result = MAX_DIST;
+    float n = snoise(vec3(samplePoint)) * 0.3;
     
     for (int i = 0 ; i < 2 ; ++i) {
         vec3 v = samplePoint - spheres[i].pos;
-        result = min(result, length(v) - spheres[i].r);
+        result = min(result, length(v) - spheres[i].r + n);
     }
     
     return result;
@@ -49,7 +101,7 @@ float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, f
     for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
         float dist = sceneSdf(eye + depth * marchingDirection);
         if (dist < EPSILON) {
-	    return depth;
+        return depth;
         }
         depth += dist;
         if (depth >= end) {
@@ -89,7 +141,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     if (dist > MAX_DIST - EPSILON) {
         // Didn't hit anything
         fragColor = vec4(0.0, 0.0, 0.0, 0.0);
-	return;
+    return;
     }
     
     // The closest point on the surface to the eyepoint along the view ray
