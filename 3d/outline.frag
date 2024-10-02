@@ -9,8 +9,11 @@ uniform float u_time;
 // Raymarch Edge Detection by HLorenzi!
 // Detects whether a ray that comes too close to a surface goes away.
 
-#define EDGE_WIDTH 0.2
+#define EDGE_WIDTH 2.
 #define RAYMARCH_ITERATIONS 40
+
+#define MAX_DIST 100.
+#define MIN_DIST 0.001
 
 // Distance functions by iquilezles.org
 float fSubtraction(float a, float b) {return max(-a,b);}
@@ -30,7 +33,7 @@ float distf(vec3 p)
 	float d = 100000.0;
 	
 	fUnion(d, pRoundBox(vec3(0,0,10) + p, vec3(11,11,1), 1.0));
-	fUnion(d, pSphere(vec3(10,10,0) + p, 8.0));
+	fUnion(d, pSphere(vec3(10,10, -6.) + p, 8.0));
 	
 	return d;
 }
@@ -38,8 +41,6 @@ float distf(vec3 p)
 
 vec4 raymarch(vec3 from, vec3 increment)
 {
-	const float maxDist = 200.0;
-	const float minDist = 0.001;
 	const int maxIter = RAYMARCH_ITERATIONS;
 	
 	float dist = 0.0;
@@ -52,25 +53,41 @@ vec4 raymarch(vec3 from, vec3 increment)
 		float distEval = distf(pos);
 		
 		if (lastDistEval < EDGE_WIDTH && distEval > lastDistEval + 0.001) {
-			edge = 1.0;
+            edge = (EDGE_WIDTH - lastDistEval) / EDGE_WIDTH;
             break;
 		}
         
-		if (distEval < minDist) {
+		if (distEval < MIN_DIST || distEval > MAX_DIST) {
 			break;
 		}
 		
 		dist += distEval;
         lastDistEval = distEval;
 	}
-	
 	return vec4(dist, 0.0, edge, 0);
 }
 
 vec4 getPixel(vec3 from, vec3 increment)
 {
+    vec4 shape_color = vec4(1, 0.5, 0, 1);
+    vec4 back_color = vec4(1, 0, 0, 1);
+    vec4 outline_color = vec4(1, 1, 0, 1);
 	vec4 c = raymarch(from, increment);
-	return mix(vec4(1,1,1,1),vec4(0,0,0,1),c.z);
+    
+    if (c.x > MAX_DIST) {
+    	// Background
+    	return back_color;   
+    }
+    if (c.z > 0.5 && c.z < 1.0) {
+        // Edge color
+        return mix(outline_color, shape_color, c.z);
+    }
+    if (c.z < 0.5 && c.z > 0.) {
+        // Edge color
+        return mix(back_color, outline_color, c.z);
+    }
+
+	return mix(shape_color, outline_color, c.z);
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
