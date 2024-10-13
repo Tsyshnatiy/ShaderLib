@@ -13,16 +13,7 @@ vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
 
-//
-// Description : GLSL 2D simplex noise function
-//      Author : Ian McEwan, Ashima Arts
-//  Maintainer : ijm
-//     Lastmod : 20110822 (ijm)
-//     License :
-//  Copyright (C) 2011 Ashima Arts. All rights reserved.
-//  Distributed under the MIT License. See LICENSE file.
-//  https://github.com/ashima/webgl-noise
-//
+
 float snoise(vec2 v) {
 
     // Precompute values for skewed triangular grid
@@ -98,6 +89,7 @@ void main() {
     float acceleration = snoise(st * vec2(cos(u_time * 0.050), sin(u_time * 0.05)) * 0.1) * M_PI;
     velocity = vec2(cos(acceleration), sin(acceleration));
     
+    // Use + to remove turbulence
     flow += snoise(st * velocity) * snoise_mult + snoise_add;
     
     vec3 color = vec3(flow);
